@@ -6,3 +6,7 @@ services:
   Digilue\SecureDownloadsViewhelper\:
     resource: '../Classes/*'
     exclude: '../Classes/Domain/Model/*'
+
+  # Service muss public sein für GeneralUtility::makeInstance() in ViewHelpern
+  Digilue\SecureDownloadsViewhelper\Service\SecureDownloadLinkService:
+    public: true
