@@ -43,11 +43,13 @@ Generates a complete `<a>` tag with secure download URL:
 <sdl:link.secureDownload file="{file}" class="btn btn-primary" target="_blank">
     Open PDF
 </sdl:link.secureDownload>
+<!-- <a href="/securedl/sdl-JWTTOKEN/filename.pdf" class="btn btn-primary" target="_blank">Download</a> -->
 
 <!-- Backend context with absolute URL -->
 <sdl:link.secureDownload file="{file}" siteIdentifier="my-landingpage">
     Download
 </sdl:link.secureDownload>
+<!-- <a href="https://my-landingpage.com/securedl/sdl-JWTTOKEN/filename.pdf">Download</a> -->
 
 <!-- With custom timeout (relative time) -->
 <sdl:link.secureDownload file="{file}" timeout="{f:format.date(date: '+2 weeks', format: 'U')}">
@@ -57,19 +59,20 @@ Generates a complete `<a>` tag with secure download URL:
 
 ### URI ViewHelper
 
-Returns only the secure URL string (without HTML tag):
+Returns only the secure URL string (without HTML tag).
+Can be used for custom link components or other scenarios like copy-paste to clipboard.
 
 ```html
-<!-- In Backend modules with external link component -->
-<f:link.external uri="{sdl:uri.secureDownload(file: document, siteIdentifier: 'powerpass')}">
-    Download PDF
-</f:link.external>
+<!-- In Backend modules with siteIdentifier -->
+{sdl:uri.secureDownload(file: document, siteIdentifier: 'landingpage')}
+<!-- https://landingpage.com/securedl/sdl-JWTTOKEN/filename.pdf -->
 
 <!-- As variable -->
-<f:variable name="downloadUrl">{sdl:uri.secureDownload(file: file, feuser: user.uid)}</f:variable>
+<f:variable name="downloadUrl">{sdl:uri.secureDownload(file: file, feuser: user)}</f:variable>
 
-<!-- With combined identifier string -->
-{sdl:uri.secureDownload(file: '2:energieausweise/dokument.pdf')}
+<!-- Inline and with combined identifier string -->
+{sdl:uri.secureDownload(file: '2:documents/document.pdf')}
+<!-- /securedl/sdl-JWTTOKEN/document.pdf -->
 ```
 
 ## Parameters
@@ -126,6 +129,72 @@ The filename in the URL is **cosmetic only** (for SEO/UX). The actual file deliv
 - TYPO3 12.4+ or 13.x
 - leuchtfeuer/secure-downloads ^6.1
 
+## Setup
+
+### Required Patch: FAL Identifier Support
+
+**Important**: The ViewHelpers use FAL Combined Identifiers (e.g., `"2:documents/file.pdf"`) to reference files in
+non-public storages. This requires a patch to the SecureDownloads Extension.
+
+**What the patch does:**
+Adds support for FAL Combined Identifiers (`storageUid:path/to/file`) and FAL UID Identifiers (`file:123`) by checking against existing FAL object earier instead of only file_exists().
+This way it allows secure links to files in non-public storage locations (outside document root).
+
+**Patch content**:
+
+```diff
+diff --git a/Classes/Resource/FileDelivery.php b/Classes/Resource/FileDelivery.php
+index 73cd1c3..4770cf4 100644
+--- a/Classes/Resource/FileDelivery.php
++++ b/Classes/Resource/FileDelivery.php
+@@ -78,7 +78,9 @@ class FileDelivery implements SingletonInterface
+             return $this->getAccessDeniedResponse($request, 'Access check failed.');
+         }
+
+-        $file = GeneralUtility::getFileAbsFileName(ltrim($this->token->getFile(), '/'));
++        if (!$this->isFalIdentifier($this->token->getFile())) {
++            $file = GeneralUtility::getFileAbsFileName(ltrim($this->token->getFile(), '/'));
++        }
+         $fileName = basename($file);
+
+         if (Environment::isWindows()) {
+@@ -87,13 +89,12 @@ class FileDelivery implements SingletonInterface
+
+         $this->dispatchAfterFileRetrievedEvent($file, $fileName);
+
+-        if (file_exists($file)) {
+-            $fileObject = $this->resourceFactory->retrieveFileOrFolderObject($file);
+-
++        $fileObject = $this->resourceFactory->retrieveFileOrFolderObject($file);
++        if (file_exists($file) || $fileObject instanceof File) {
+             if ($this->extensionConfiguration->isLog()) {
+                 $this->token->log([
+-                    'fileSize' => $fileSize = (int)filesize($file),
+-                    'mimeType' => (new FileInfo($file))->getMimeType()
++                    'fileSize' => $fileSize = $fileObject?->getSize() ?: (int)filesize($file),
++                    'mimeType' => $fileObject?->getMimeType() ?: (new FileInfo($file))->getMimeType()
+                         ?: $this->guessMimeTypeByFileExtension($file)
+                             ?: MimeTypes::DEFAULT_MIME_TYPE,
+                 ]);
+@@ -373,4 +374,14 @@ class FileDelivery implements SingletonInterface
+         $outputFunction = $event->getOutputFunction();
+         $header = $event->getHeader();
+     }
++
++    /**
++     * Checks if the token value is a FAL identifier
++     * Either combined identifier format: "1:path/file.jpg" (storageUID:path)
++     * or UID Identifier format: "file:123"
++     */
++    protected function isFalIdentifier(string $value): bool
++    {
++        return str_contains($value, ':') && (preg_match('/^\d+:/', $value) || str_starts_with($value, 'file:'));
++    }
+ }
+```
+
+**Without this patch**, the ViewHelpers will only work with file paths and thus files in public storages (inside document root) only.
+
 ## Known Issues
 
 ### SecureLinkFactory::withUser() Bug
@@ -136,7 +205,7 @@ The `withUser()` method modifies the token but exhibits inconsistent behavior - 
 **Workaround**: Ensure proper user context is set before generating links, or validate user access server-side.
 
 ### JWT Page Field Not Validated
-Note: The Page field is stored in the JWT token but not validated during file delivery (no PageCheck class registered in SecureDownloads Extension).
+Note: The page field is stored in the JWT token but not validated during file delivery (no PageCheck class registered in SecureDownloads Extension).
 
 ### EncodeCache Side Effects
 The internal encode cache in SecureLinkFactory can lead to unexpected results when modifying tokens multiple times. Check if we need to clone the factory instance to avoid cache pollution.
