@@ -1,0 +1,21 @@
+{
+    "name": "digilue/secure-downloads-viewhelper",
+    "description": "Viewhelper to create secured download links with leuchtfeuer/secure-downloads",
+    "type": "typo3-cms-extension",
+    "license": [
+        "GPL-2.0-or-later"
+    ],
+    "require": {
+        "typo3/cms-core": "^12.4 || ^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Digilue\\SecureDownloadsViewhelper\\": "Classes/"
+        }
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "secure_downloads_viewhelper"
+        }
+    }
+}
