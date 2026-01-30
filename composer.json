@@ -6,8 +6,8 @@
         "GPL-2.0-or-later"
     ],
     "require": {
-        "typo3/cms-core": "^12.4 || ^13.0",
-        "leuchtfeuer/secure-downloads": "^6.1"
+        "typo3/cms-core": "^13.4",
+        "leuchtfeuer/secure-downloads": "^7.x"
     },
     "autoload": {
         "psr-4": {
