@@ -70,7 +70,7 @@ class SecureDownloadLinkService
      * @param mixed $file Extbase FileReference, Core FileReference, oder File Objekt
      * @return string|null Combined Identifier oder null wenn ungültig
      */
-    public function extractIdentifierFromFile($file): ?string
+    public function extractIdentifierFromFile(mixed $file): ?string
     {
         return match (true) {
             $file instanceof ExtbaseFileReference => $file->getOriginalResource()->getOriginalFile()->getCombinedIdentifier(),
@@ -102,7 +102,7 @@ class SecureDownloadLinkService
 
             // Ensure single slash between domain and path
             return rtrim($domain, '/') . '/' . ltrim($url, '/');
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             // Fallback: return original URL if site not found
             return $url;
         }
