@@ -36,7 +36,8 @@ class SecureDownloadLinkService
         string $resourceUri,
         ?int $userId = null,
         ?int $timeout = null,
-        ?string $siteIdentifier = null
+        ?string $siteIdentifier = null,
+        ?int $pageId = null
     ): string {
         $factory = clone $this->secureLinkFactory;
         $factory = $factory->withResourceUri($resourceUri);
@@ -49,6 +50,23 @@ class SecureDownloadLinkService
         // Only set timeout if provided
         if ($timeout !== null) {
             $factory = $factory->withLinkTimeout($timeout);
+        }
+
+        // For public links (user=0) without explicit pageId: auto-resolve root page from siteIdentifier.
+        // FileDelivery blocks tokens where page=0 AND user=0 ("Backend link detected"),
+        // so we need a non-zero page value for public links created outside a frontend request (e.g. CLI/Backend).
+        if ($pageId === null && $userId === 0 && $siteIdentifier !== null) {
+            try {
+                $pageId = $this->siteFinder->getSiteByIdentifier($siteIdentifier)->getRootPageId();
+            } catch (\Exception) {
+                // Fallback: leave pageId null, let SecureLinkFactory handle it
+            }
+        }
+
+        // Explicitly set page if provided (required in CLI context for public links where user=0,
+        // because FileDelivery blocks tokens with page=0 AND user=0 as "Backend link detected")
+        if ($pageId !== null) {
+            $factory = $factory->withPage($pageId);
         }
 
         $url = $factory->getUrl();
