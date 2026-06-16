@@ -6,7 +6,7 @@
     ],
     "type": "typo3-cms-extension",
     "require": {
-        "leuchtfeuer/secure-downloads": "^7.0",
+        "leuchtfeuer/secure-downloads": "^7.0 || ^14.0",
         "typo3/cms-core": "~13.4.0 || ~14.3.0"
     },
     "autoload": {
