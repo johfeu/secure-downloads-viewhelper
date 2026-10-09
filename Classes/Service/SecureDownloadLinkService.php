@@ -30,7 +30,7 @@ class SecureDownloadLinkService
      * @param int|null $userId User ID für Access Restriction, oder null
      * @param int|null $timeout Link Timeout in Sekunden, oder null für Default TTL
      * @param string|null $siteIdentifier TYPO3 Site Identifier für Domain-Prefix (für Backend-Kontext)
-     * @return string Die gesicherte Download-URL mit JWT Token
+     * @return string Die gesicherte Download-URL mit JWT Token (absolut mit siteIdentifier, sonst root-relativ)
      */
     public function createSecureLink(
         string $resourceUri,
@@ -73,10 +73,23 @@ class SecureDownloadLinkService
 
         // Prepend domain if siteIdentifier is provided (for Backend context)
         if ($siteIdentifier !== null) {
-            $url = $this->prependSiteDomain($url, $siteIdentifier);
+            return $this->prependSiteDomain($url, $siteIdentifier);
         }
 
-        return $url;
+        return $this->makeRootRelative($url);
+    }
+
+    /**
+     * SecureLinkFactory returns "securedl/sdl-…/file.pdf" without a leading slash, which browsers
+     * resolve against the current page path (e.g. /account/securedl/…) and which then fails with 404.
+     */
+    protected function makeRootRelative(string $url): string
+    {
+        if (parse_url($url, PHP_URL_SCHEME) !== null || str_starts_with($url, '/')) {
+            return $url;
+        }
+
+        return '/' . $url;
     }
 
     /**
